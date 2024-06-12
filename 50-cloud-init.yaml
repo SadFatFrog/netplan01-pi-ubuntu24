@@ -1,33 +1,95 @@
-# change IP addresses, search and wlan0 info to suit your lan
+# This file is generated from information provided by the datasource.  Changes
+# to it will not persist across an instance reboot.  To disable cloud-init's
+# network configuration capabilities, write a file
+# /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg with the following:
+# network: {config: disabled}
+#
+# Notes for applying config
+#   config was performed on a Pi 4b+ after SD card setup via Raspberry Pi Imager (v1.8.5) with Ubuntu Server 24.04 LTS
+#
+#   set up the pi via the imager, I like to use the wifi config options in there to make life easy, do a first boot, find your pi's ip via your router,
+#    then ssh in and run sudo apt update && sudo apt upgrade as usual
+#   sometimes the eth0 would not be visible after using the Pi Imager install with WiFi,
+#    so install net-tools and run "ip a" to get the eth0 mac address for the match value
+#       sudo apt install net-tools -y && ip a
+#   by the way, if you have mac filtering on your wifi (pi 4 doesn't do wpa3 yet) get both the eth0 and wlan mac addresses whitelisted
+#   
+#   next, make a copy of the stock/working cloud-init file to be changed so you can always go back to a working config
+#       sudo cp /etc/netplan/50-cloud-init.yaml ~/stock-50-cloud-init.yaml
+#
+#   now, to actually set things up...
+#   modify the configuration below to match your network
+#    put in the eth0 mac address, set your preferred DNS ip(s), WiFi SSID and password, and your gateway under "routes"
+#    next, get that into the actual file...
+#       sudo nano /etc/netplan/50-cloud-init.yaml
+#    save your work with Ctrl + X; then Y to save changes
+#   make changes or just replace the file before running the next 2 commands to apply it
+#       sudo netplan generate
+#       sudo netplan apply
+#
+#   assuming you did not change your IP address, you should still be connected to the pi over SSH
+#    otherwise, connect to the new ip to see if things are working, or better yet, run a ping test
+#   make sure the pi is connected to the network via an ethernet cable; from your current machine, ping the pi's ip
+#       ping 192.168.1.5
+#    or ping 192.168.1.5 -t (for windows users)
+#   you should see 64b replies with <1ms times; leave the ping going and disconnect the ethernet cable from the pi
+#    if all goes well, you should see those 64b replies take a little longer maybe 20ms or so at first before stablizing around 4-5ms
+#    reconnect the ethernet to see the times dip back down... and maybe fail a bit at first - 1-3 seconds from wlan to lan seems to happen sometimes
+#
+#
+# Some extras for you...
+#
+#   Hiding the WPA Passphrase
+#    You can replace the plain-text password in the configuration with a hashed version, like what was in place if you set up WiFi in the Pi Imager
+#    This is just a simple command in the terminal: `wpa_passphrase ssid_name plain-text-password`
+#    It at least worked for the WPA2 security I had in place...
+#       wpa_passphrase my_personal_wifi_ssid_here MySuperSecretPasswordPlzDontLeak!
+#           network={
+#               ssid="my_personal_wifi_ssid_here"
+#               #psk="MySuperSecretPasswordPlzDontLeak!"
+#               psk=6e12dc179c1fd5f46efc3cf0a35786b65b4ec889d0f3666ae065a09e8fd37fab
+#           }
+#
+#   Copy file:          sudo cp /etc/netplan/50-cloud-init.yaml ~/stock-50-cloud-init.yaml
+#   Copy BACK:          sudo cp ~/stock-50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml
+#
+#   Debugging YAML:     sudo apt install yamllint
+#                       sudo yamllint /etc/netplan/50-cloud-init.yaml
+#
+#   Debugging netplan:  sudo netplan --debug generate
+#
 network:
     ethernets:
         eth0:
-          optional: true
-          dhcp4: false
-          dhcp6: false
+            optional: true
+            dhcp4: false
+            dhcp6: false
+            match:
+                macaddress: x0:x0:x0:x0:x0:x0
     wifis:
-      wlan0:
-         dhcp4: false
-         dhcp6: false
-         access-points:
-           "your-SSID":
-              password: "your-wlan-pw"
-
+        wlan0:
+            dhcp4: false
+            dhcp6: false
+            access-points:
+              my_personal_wifi_ssid_here:
+                password: "MySuperSecretPasswordPlzDontLeak!"
     bonds:
-       bond0:
-         dhcp4: false
-         dhcp6: false
-         interfaces: [eth0, wlan0]
-         addresses:
-                - 192.168.0.17/24
-         gateway4: 192.168.0.1
-         nameservers:
-                addresses: [192.168.0.18, 192.168.0.17, 8.8.8.8]
+        bond0:
+            dhcp4: false
+            dhcp6: false
+            interfaces: [eth0, wlan0]
+            addresses:
+             - 192.168.1.5/24
+            routes:
+             - to: default
+               via: 192.168.1.1
+            nameservers:
+                addresses: [192.168.1.4, 208.67.222.222, 208.67.220.220]
                 search: [home.local]
-         parameters:
-           mode: balance-xor
-           lacp-rate: fast
-           mii-monitor-interval: 100
-           fail-over-mac-policy: active
-         optional: true
+            parameters:
+                mode: active-backup
+                primary: eth0
+                mii-monitor-interval: 100
+                fail-over-mac-policy: active
+            optional: true
     version: 2
